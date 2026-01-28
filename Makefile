@@ -409,7 +409,9 @@ SEPCOMP_FILES = \
   mem_wd.v \
   semantics.v semantics_lemmas.v \
   step_lemmas.v \
-  structured_injections.v
+  structured_injections.v \
+  locations.v lang.v \
+  lang_core.v
 
 # what is:  erasure.v context.v context_equiv.v jstep.v
 
