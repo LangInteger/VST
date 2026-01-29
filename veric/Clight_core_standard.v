@@ -107,7 +107,7 @@ Definition cl_initial_core (ge: genv) (v: val) (args: list val) : option CC_core
 
 Definition stuck_signature : signature := mksignature nil None cc_default.
 
-Definition cl_nal (c: CC_core) : option (external_function * list val) :=
+Definition cl_at_external (c: CC_core) : option (external_function * list val) :=
   match c with
   | Callstate (External ef _ _ _) args _ => Some (ef, args)
   | State _ (Sbuiltin _ ef _ args) _ _ _ => Some (EF_external "stuck" stuck_signature, nil)
@@ -269,6 +269,7 @@ intros until q'; intros H.
 unfold cl_after_external in H.
 destruct q; inv H. destruct f; inv H1. reflexivity.
 Qed.
+
 Program Definition cl_core_sem (ge: genv) :
   @CoreSemantics CC_core mem :=
   @Build_CoreSemantics _ _

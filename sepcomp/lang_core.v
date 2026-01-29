@@ -5,7 +5,7 @@ Require compcert.common.Globalenvs.
 Require Import compcert.common.Events.
 Require Import compcert.cfrontend.Clight.
 
-Require Import VST.sepcomp.semantics.
+Require Import VST.sepcomp.semantics_generic.
 Require Import VST.sepcomp.semantics_lemmas.
 Require Import VST.sepcomp.mem_lemmas.
 
@@ -56,18 +56,14 @@ Definition compcert_val_to_heaplang (v : Values.val) : option val :=
   end.
 
 (* store all the function info *)
-Parameter global_expr_env : Values.val -> option expr.
+Parameter global_expr_env : val -> option expr.
 
-Definition HL_initial_core (v: Values.val) (params: list Values.val) : option HL_core :=
+Definition HL_initial_core (v: val) (params: list val) : option HL_core :=
   match global_expr_env v with
   | Some (Rec f x e) => 
       match params with
       | arg_val :: nil =>
-          match compcert_val_to_heaplang arg_val with
-          | Some hl_arg_val =>
-              Some (HL_Callstate f hl_arg_val [])
-          | None => None
-          end
+          Some (HL_Callstate f arg_val [])
       | _ => None
       end
   | _ => None
@@ -121,7 +117,7 @@ Qed.
 
 
 Program Definition HL_core_sem:
-  @CoreSemantics HL_core state :=
+  @CoreSemantics HL_core state val :=
   @Build_CoreSemantics _ _
     (*deprecated cl_init_mem*)
     (fun _ m c m' v arg => HL_initial_core v arg = Some c)

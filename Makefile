@@ -407,7 +407,7 @@ SEPCOMP_FILES = \
   mem_lemmas.v \
   reach.v \
   mem_wd.v \
-  semantics.v semantics_lemmas.v \
+  semantics.v semantics_generic.v semantics_lemmas.v \
   step_lemmas.v \
   structured_injections.v \
   locations.v lang.v \
