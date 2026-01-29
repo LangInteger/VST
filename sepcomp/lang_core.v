@@ -69,11 +69,11 @@ Definition HL_initial_core (v: val) (params: list val) : option HL_core :=
   | _ => None
   end.
 
-
 Definition default_signature : signature := mksignature nil Xvoid cc_default.
 Definition HL_at_external (c: HL_core) : option (external_function * list val) :=
   match c with
-  | HL_Callstate f arg K => Some ((EF_external "xx" default_signature), [arg])
+  (* only when func name can be extracted from the binder *)
+  | HL_Callstate (BNamed fname) arg K => Some ((EF_external fname default_signature), [arg])
   | _ => None
   end.
 
