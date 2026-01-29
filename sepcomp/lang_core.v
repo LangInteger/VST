@@ -12,27 +12,6 @@ Require Import VST.sepcomp.mem_lemmas.
 Require Import VST.sepcomp.lang.
 Require Import VST.sepcomp.tactics.
 
-Inductive HL_core : Type :=
-  | HL_State : expr -> list ectx_item -> HL_core
-  | HL_Callstate : binder -> val -> list ectx_item -> HL_core
-  | HL_Returnstate : val -> list ectx_item -> HL_core.
-
-Inductive HL_core_step : HL_core -> state -> HL_core -> state -> Prop :=
-  | HL_step_base : 
-      (* internal step *)
-      forall e K σ σ' κs e' efs,
-        base_step e σ κs e' σ' efs ->
-        HL_core_step (HL_State e K) σ (HL_State e' K) σ'
-  | HL_step_external :
-      (* internal step meets external function call *)
-      forall fname arg K σ,
-        HL_core_step (HL_State (ExternalCall fname (Val arg)) K) σ
-                     (HL_Callstate fname arg K) σ
-  | HL_step_return :
-      forall v K σ,
-        HL_core_step (HL_Returnstate v K) σ (HL_State (Val v) K) σ
-  .
-
 Inductive hl_prim_step : expr -> state -> expr -> state -> Prop :=
   | hl_prim_step_base : 
       forall e σ σ' κs e' efs,
