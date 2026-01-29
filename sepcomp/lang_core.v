@@ -16,15 +16,6 @@ Inductive HL_core : Type :=
   | HL_Callstate : binder -> val -> list ectx_item -> HL_core
   | HL_Returnstate : val -> list ectx_item -> HL_core.
 
-
-(* Definition HL_core_to_expr (c : HL_core) : expr :=
-  match c with
-  | HL_State e K => fill K e
-  | HL_Callstate f arg K => fill K (ExternalCall f (Val arg))
-  | HL_Returnstate v K => fill K (Val v)
-  end.
-*)
-
 Inductive HL_core_step : HL_core -> state -> HL_core -> state -> Prop :=
   | HL_step_base : 
       (* internal step *)
@@ -40,20 +31,6 @@ Inductive HL_core_step : HL_core -> state -> HL_core -> state -> Prop :=
       forall v K σ,
         HL_core_step (HL_Returnstate v K) σ (HL_State (Val v) K) σ
   .
-
-(* HeapLang val -> CompCert Values.val *)
-Definition heaplang_val_to_compcert (v : val) : option Values.val :=
-  match v with
-  | LitV (LitInt n) => Some (Values.Vint (Int.repr n))
-  | _ => None
-  end.
-
-(* CompCert Values.val -> HeapLang val *)
-Definition compcert_val_to_heaplang (v : Values.val) : option val :=
-  match v with
-  | Values.Vint i => Some (LitV (LitInt (Int.signed i)))
-  | _ => None  
-  end.
 
 (* store all the function info *)
 Parameter global_expr_env : val -> option expr.
