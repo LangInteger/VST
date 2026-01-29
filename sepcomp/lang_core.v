@@ -69,9 +69,11 @@ Definition HL_initial_core (v: val) (params: list val) : option HL_core :=
   | _ => None
   end.
 
-Definition HL_at_external (c: HL_core) : option (binder * val) :=
+
+Definition default_signature : signature := mksignature nil Xvoid cc_default.
+Definition HL_at_external (c: HL_core) : option (external_function * list val) :=
   match c with
-  | HL_Callstate f arg K => Some (f, arg)
+  | HL_Callstate f arg K => Some ((EF_external "xx" default_signature), [arg])
   | _ => None
   end.
 
@@ -92,18 +94,18 @@ Definition HL_halted (c: HL_core) : option val :=
   end.
 
 Lemma HL_corestep_not_halted :
-  forall m q m' q' (i: int), HL_core_step q m q' m' -> HL_halted q = None.
+  forall m q m' q' (i: int), HL_core_step q m q' m' -> not ((HL_halted q) ≠ None).
 Proof.
   intros.
   inv H.
   {
-    inv H0; simpl; reflexivity.
+    inv H0; simpl; intro; contradiction.
   }
   {
-    simpl. reflexivity.
+    simpl. intro. contradiction.
   }
   {
-    simpl. reflexivity.
+    simpl. intro. contradiction.
   }
 Qed.
 
@@ -118,12 +120,13 @@ Qed.
 
 Program Definition HL_core_sem:
   @CoreSemantics HL_core state val :=
-  @Build_CoreSemantics _ _
+  @Build_CoreSemantics _ _ _
     (*deprecated cl_init_mem*)
-    (fun _ m c m' v arg => HL_initial_core v arg = Some c)
+    (fun _ m c m' v arg => (HL_initial_core v arg = Some c) /\ m' = m)
     (fun c _ => HL_at_external c)
     (fun ret c _ => hl_after_external ret c)
-    (fun c _ =>  not (eq (HL_halted c, None)))
+    (* (fun c _ =>  HL_halted c <> None) *)
+    (fun c _ =>  not (eq (HL_halted c) None))
     (HL_core_step)
     (HL_corestep_not_halted)
     (HL_corestep_not_at_external).

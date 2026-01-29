@@ -154,6 +154,7 @@ Axiom no_event_sound:
   forall ge args m t v m',
    external_call ef ge args m t v m' -> t=E0.
 *)
+
 Definition cl_at_external (c: CC_core) : option (external_function * list val) :=
   match c with
   | Callstate (External ef _ _ _) args _ => 
