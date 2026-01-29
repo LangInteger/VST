@@ -410,7 +410,7 @@ SEPCOMP_FILES = \
   semantics.v semantics_generic.v semantics_lemmas.v \
   step_lemmas.v \
   structured_injections.v \
-  locations.v lang.v \
+  locations.v lang.v tactics.v \
   lang_core.v
 
 # what is:  erasure.v context.v context_equiv.v jstep.v
