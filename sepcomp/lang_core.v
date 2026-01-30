@@ -22,7 +22,7 @@ Inductive hl_prim_step : expr -> state -> expr -> state -> Prop :=
 (* store all the function info *)
 Parameter global_expr_env : val -> option expr.
 
-Definition HL_initial_core (v: val) (params: list val) : option expr :=
+Definition hl_initial_core (v: val) (params: list val) : option expr :=
   match global_expr_env v with
   | Some (Rec f x e) => 
       match params with
@@ -34,7 +34,7 @@ Definition HL_initial_core (v: val) (params: list val) : option expr :=
   end.
 
 Definition default_signature : signature := mksignature nil Xvoid cc_default.
-Definition HL_at_external (e: expr) : option (external_function * list val) :=
+Definition hl_at_external (e: expr) : option (external_function * list val) :=
   match (decompose_expr 1000 [] e) with
   (* only when func name can be extracted from the binder *)
   | Some (K, ExternalCall (BNamed fname) arg) => 
@@ -60,25 +60,30 @@ Definition hl_after_external (vret: option val) (e: expr) : option expr :=
   | None => None
   end.
 
-Definition HL_halted (e: expr) : option val :=
-  match (to_val e) with
-  | Some v => Some v
-  | _ => None
-  end.
+Definition hl_halted (e: expr) : option val := to_val e.
 
 Lemma HL_corestep_not_halted :
-  forall m q m' q' (i: int), hl_prim_step q m q' m' -> not ((HL_halted q) ≠ None).
+  forall m q m' q' (i: int), hl_prim_step q m q' m' -> not ((hl_halted q) ≠ None).
 Proof.
   intros.
-  inv H. inv H0.
-Admitted.
+  inv H. inv H0. simpl. inv H2;
+  unfold hl_halted;
+  destruct to_val eqn:Heq; eauto;
+  apply to_val_fill_some in Heq;
+  destruct Heq as [veq Heq];
+  congruence.
+Qed.
 
+Search ectx.
 Lemma HL_corestep_not_at_external:
   forall m q m' q', 
-          hl_prim_step q m q' m' -> HL_at_external q = None.
+          hl_prim_step q m q' m' -> hl_at_external q = None.
 Proof.
- simpl; intros.
- inv H; try reflexivity; simpl.
+ intros.
+ inv H. inv H0. simpl.
+ destruct hl_at_external eqn:H3; eauto.
+ destruct H2.
+ unfold hl_at_external in H3.
 Admitted.
 
 
@@ -86,20 +91,30 @@ Program Definition HL_core_sem:
   @CoreSemantics expr state val :=
   @Build_CoreSemantics _ _ _
     (*deprecated cl_init_mem*)
-    (fun _ m c m' v arg => (HL_initial_core v arg = Some c) /\ m' = m)
-    (fun c _ => HL_at_external c)
+    (fun _ m c m' v arg => (hl_initial_core v arg = Some c) /\ m' = m)
+    (fun c _ => hl_at_external c)
     (fun ret c _ => hl_after_external ret c)
     (* (fun c _ =>  HL_halted c <> None) *)
-    (fun c _ =>  not (eq (HL_halted c) None))
+    (fun c _ =>  not (eq (hl_halted c) None))
     (hl_prim_step)
     (HL_corestep_not_halted)
     (HL_corestep_not_at_external).
 
+
+Search prim_step.
 Section specs.
 
-  Variable f_names : list string.
-  Variable f_specs : string -> mem -> Prop.
-
-  Theorem respecting_the_specs : (forall f, In f f_names, f_specs f) -> 
+  Inductive respecting_the_specs (e : expr) (m : state) (Q : state -> Prop) : Prop :=
+    | rts_base : 
+      (* internal steps *)
+      ((forall (e' : expr) (m' : state), hl_prim_step e m e' m' -> respecting_the_specs e' m' Q )
+        (* halted case *)
+        /\ (not (eq (hl_halted e) None) -> Q m)
+        (* external call case *)
+        /\ (forall fname sig args vret e',
+          hl_at_external e = Some (EF_external fname sig, args)
+          -> hl_after_external (Some vret) e = Some e'
+          -> respecting_the_specs e' m Q) 
+      ) -> respecting_the_specs e m Q.
 
 End specs.

@@ -37,6 +37,13 @@ Fixpoint decompose_expr (gas : nat) (K : list ectx_item) (e : expr)
   end
 end.
 
+Lemma decompose_expr_fill :
+  forall gas e K' e',
+    decompose_expr gas [] e = Some (K', e') ->
+    e = fill K' e'.
+Proof.
+Admitted.
+
 (** The tactic [reshape_expr e tac] decomposes the expression [e] into an
 evaluation context [K] and a subexpression [e']. It calls the tactic [tac K e']
 for each possible decomposition until [tac] succeeds. *)
