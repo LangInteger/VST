@@ -667,12 +667,7 @@ Inductive base_step : expr → state → list observation → expr → state →
      base_step (Store (Val $ LitV $ LitLoc l) (Val w)) σ
                []
                (Val $ LitV LitUnit) (state_upd_heap <[l:=Some w]> σ)
-               []
-  | ExternalCallS fn v σ v':
-      first_order_val v →
-      first_order_val v' →
-      external_call fn v v' →
-      base_step (ExternalCall fn (Val v)) σ [] (Val v') σ [].
+               [].
 
 (** Basic properties about the language *)
 Global Instance fill_item_inj Ki : Inj (=) (=) (fill_item Ki).

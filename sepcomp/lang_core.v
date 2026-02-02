@@ -75,15 +75,32 @@ Proof.
   congruence.
 Qed.
 
-Search ectx.
 Lemma HL_corestep_not_at_external:
   forall m q m' q', 
-          hl_prim_step q m q' m' -> hl_at_external q = None.
+    hl_prim_step q m q' m' -> hl_at_external q = None.
 Proof.
- intros.
- inv H.
- unfold hl_at_external.
+  intros m q m' q' Hstep.
+  inversion Hstep as [e σ σ' κs e' efs Hprim]; subst.
+  destruct Hprim as [K e1 e2 Hbase Hfill].
+  unfold hl_at_external.
+  destruct (decompose_expr [] (fill K e1)) eqn:Heq.
+  destruct p as [K' e_ext].
+  destruct e_ext eqn:Heq_ext; rewrite Hbase; simpl; rewrite Heq; try reflexivity.
+
+  (* Only the case where e_ext is an external call left *)
+
+  (* But base_step never steps an external call at the head *)
+  assert (forall σ κ e2 σ' efs fn arg,
+            base_step e1 σ κ e2 σ' efs -> not (e1 = ExternalCall fn arg)) as Hnot_ext.
+  { intros. inversion H0; intro Heq1; discriminate. }
+  specialize (Hnot_ext m κs e2 m' efs fname e H).
+
+  (* try to build a contradictory here, show that e_ext should not be an external call *)
+  
+  (* for that, I need to show: decompose_expr [] (fill K e1) = Some (k e1), which is not provable *)
+
 Admitted.
+Qed.
 
 
 Program Definition HL_core_sem:
