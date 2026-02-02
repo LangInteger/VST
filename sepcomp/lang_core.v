@@ -11,6 +11,7 @@ Require Import VST.sepcomp.mem_lemmas.
 
 Require Import VST.sepcomp.lang.
 Require Import VST.sepcomp.tactics.
+Require Import VST.sepcomp.locations.
 
 Inductive hl_prim_step : expr -> state -> expr -> state -> Prop :=
   | hl_prim_step_base : 
@@ -99,19 +100,47 @@ Program Definition HL_core_sem:
     (HL_corestep_not_at_external).
 
 
+Notation uobj_id := nat.
+
+(* how to support pointer to pointer *)
+Definition closed (locs : list loc) (m : state) : Prop :=
+  forall l l',
+    In l locs ->
+    m.(heap) !! l = Some $ Some (LitV (LitLoc l')) ->
+    In l' locs.
+
+Definition sublist (l1 l2 : list loc) : Prop :=
+  forall x, In x l1 -> In x l2.
+
 Search prim_step.
 Section specs.
 
+  (* compartmentally pre-allocated heap space for uids *)
+  Variable heap_by_uid : uobj_id -> list loc.  
+  Variable uid : uobj_id.
+  (* fname -> (isCasm func * (pre-cond, post-cond)) *)
+  Variable ext_funcs : string -> option (bool * ((state -> Prop) * (state -> Prop))). 
+
+  Definition R_relation (m: state) (m': state) (modified: bool) : Prop :=
+    closed (heap_by_uid uid) m' 
+    /\ subseteq (dom m.(heap)) (dom m'.(heap))
+    /\ (not modified -> forall l, In l (heap_by_uid uid) -> m.(heap) !! l = m'.(heap) !! l).
+
   Inductive respecting_the_specs (e : expr) (m : state) (Q : state -> Prop) : Prop :=
     | rts_base : 
+      forall m', R_relation m m' false ->
       (* internal steps *)
-      ((forall (e' : expr) (m' : state), hl_prim_step e m e' m' -> respecting_the_specs e' m' Q )
+      ((forall (e' : expr) (m'' : state), hl_prim_step e m' e' m'' -> respecting_the_specs e' m'' Q )
         (* halted case *)
-        /\ (not (eq (hl_halted e) None) -> Q m)
+        /\ (not (eq (hl_halted e) None) -> Q m')
         (* external call case *)
-        /\ (forall fname sig args vret e',
+        /\ (forall fname sig args is_casm (pre_spec : state -> Prop) m'' (post_spec : state -> Prop) vret e',
           (* m_extra satisfied the pre_sped of the external call *)
           hl_at_external e = Some (EF_external fname sig, args)
+          -> Some (is_casm, (pre_spec, post_spec) ) = ext_funcs fname
+          -> pre_spec m'
+          -> R_relation m' m'' is_casm
+          -> post_spec m''
           -> hl_after_external (Some vret) e = Some e'
           -> respecting_the_specs e' m Q) 
       ) -> respecting_the_specs e m Q.
