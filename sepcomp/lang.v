@@ -66,9 +66,6 @@ Delimit Scope val_scope with V.
 
 Module heap_lang.
 
-(** Expressions and vals. *)
-Definition proph_id := positive.
-
 (** We have a notion of "poison" as a variant of unit that may not be compared
 with anything. This is useful for erasure proofs: if we erased things to unit,
 [<erased> == unit] would evaluate to true after erasure, changing program
@@ -76,7 +73,7 @@ behavior. So we erase to the poison value instead, making sure that no legal
 comparisons could be affected. *)
 Inductive base_lit : Set :=
   | LitInt (n : Z) | LitBool (b : bool) | LitUnit | LitPoison
-  | LitLoc (l : loc) | LitProphecy (p: proph_id).
+  | LitLoc (l : loc).
 Inductive un_op : Set :=
   | NegOp | MinusUnOp.
 Inductive bin_op : Set :=
@@ -113,14 +110,6 @@ Inductive expr :=
   | Free (e : expr)
   | Load (e : expr)
   | Store (e1 : expr) (e2 : expr)
-  | CmpXchg (e0 : expr) (e1 : expr) (e2 : expr) (* Compare-exchange *)
-  | Xchg (e0 : expr) (e1 : expr) (* exchange *)
-  | FAA (e1 : expr) (e2 : expr) (* Fetch-and-add *)
-  (* Concurrency *)
-  | Fork (e : expr)
-  (* Prophecy *)
-  | NewProph
-  | Resolve (e0 : expr) (e1 : expr) (e2 : expr) (* wrapped expr, proph, val *)
   (* external function call *)
   | ExternalCall (fname : binder) (arg : expr)
 with val :=
@@ -146,6 +135,8 @@ Inductive first_order_val : val → Prop :=
     first_order_val v →
     first_order_val (InjRV v).
 
+(** Expressions and vals. *)
+Definition proph_id := positive.
 (** An observation associates a prophecy variable (identifier) to a pair of
 values. The first value is the one that was returned by the (atomic) operation
 during which the prophecy resolution happened (typically, a boolean when the
@@ -190,7 +181,7 @@ Definition lit_is_unboxed (l: base_lit) : Prop :=
   match l with
   (** Disallow comparing (erased) prophecies with (erased) prophecies, by
   considering them boxed. *)
-  | LitProphecy _ | LitPoison => False
+  | LitPoison => False
   | LitInt _ | LitBool _  | LitLoc _ | LitUnit => True
   end.
 Definition val_is_unboxed (v : val) : Prop :=
@@ -266,16 +257,6 @@ Proof.
      | Load e, Load e' => cast_if (decide (e = e'))
      | Store e1 e2, Store e1' e2' =>
         cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
-     | CmpXchg e0 e1 e2, CmpXchg e0' e1' e2' =>
-        cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
-     | Xchg e0 e1, Xchg e0' e1' =>
-        cast_if_and (decide (e0 = e0')) (decide (e1 = e1'))
-     | FAA e1 e2, FAA e1' e2' =>
-        cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
-     | Fork e, Fork e' => cast_if (decide (e = e'))
-     | NewProph, NewProph => left _
-     | Resolve e0 e1 e2, Resolve e0' e1' e2' =>
-        cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
      | ExternalCall fname arg, ExternalCall fname' arg' =>
         cast_if_and (decide (fname = fname')) (decide (arg = arg'))
      | _, _ => right _
@@ -299,20 +280,18 @@ Proof. solve_decision. Defined.
 Global Instance base_lit_countable : Countable base_lit.
 Proof.
  refine (inj_countable' (λ l, match l with
-  | LitInt n => (inl (inl n), None)
-  | LitBool b => (inl (inr b), None)
-  | LitUnit => (inr (inl false), None)
-  | LitPoison => (inr (inl true), None)
-  | LitLoc l => (inr (inr l), None)
-  | LitProphecy p => (inr (inl false), Some p)
+  | LitInt n => inl (inl n)
+  | LitBool b => inl (inr b)
+  | LitUnit => inr (inl false)
+  | LitPoison => inr (inl true)
+  | LitLoc l => inr (inr l)
   end) (λ l, match l with
-  | (inl (inl n), None) => LitInt n
-  | (inl (inr b), None) => LitBool b
-  | (inr (inl false), None) => LitUnit
-  | (inr (inl true), None) => LitPoison
-  | (inr (inr l), None) => LitLoc l
-  | (_, Some p) => LitProphecy p
-  end) _); by intros [].
+  | inl (inl n) => LitInt n
+  | inl (inr b) => LitBool b
+  | inr (inl false) => LitUnit
+  | inr (inl true) => LitPoison
+  | inr (inr l) => LitLoc l
+  end) _); by intros []; auto.
 Qed.
 Global Instance un_op_finite : Countable un_op.
 Proof.
@@ -349,16 +328,10 @@ Proof.
      | InjL e => GenNode 9 [go e]
      | InjR e => GenNode 10 [go e]
      | Case e0 e1 e2 => GenNode 11 [go e0; go e1; go e2]
-     | Fork e => GenNode 12 [go e]
      | AllocN e1 e2 => GenNode 13 [go e1; go e2]
      | Free e => GenNode 14 [go e]
      | Load e => GenNode 15 [go e]
      | Store e1 e2 => GenNode 16 [go e1; go e2]
-     | CmpXchg e0 e1 e2 => GenNode 17 [go e0; go e1; go e2]
-     | Xchg e0 e1 => GenNode 18 [go e0; go e1]
-     | FAA e1 e2 => GenNode 19 [go e1; go e2]
-     | NewProph => GenNode 20 []
-     | Resolve e0 e1 e2 => GenNode 21 [go e0; go e1; go e2]
      (* not sure about the inr inl *)
      | ExternalCall fname arg => GenNode 22 [GenLeaf (inr (inr (inl fname))); go arg]
      end
@@ -388,16 +361,10 @@ Proof.
      | GenNode 9 [e] => InjL (go e)
      | GenNode 10 [e] => InjR (go e)
      | GenNode 11 [e0; e1; e2] => Case (go e0) (go e1) (go e2)
-     | GenNode 12 [e] => Fork (go e)
      | GenNode 13 [e1; e2] => AllocN (go e1) (go e2)
      | GenNode 14 [e] => Free (go e)
      | GenNode 15 [e] => Load (go e)
      | GenNode 16 [e1; e2] => Store (go e1) (go e2)
-     | GenNode 17 [e0; e1; e2] => CmpXchg (go e0) (go e1) (go e2)
-     | GenNode 18 [e0; e1] => Xchg (go e0) (go e1)
-     | GenNode 19 [e1; e2] => FAA (go e1) (go e2)
-     | GenNode 20 [] => NewProph
-     | GenNode 21 [e0; e1; e2] => Resolve (go e0) (go e1) (go e2)
      (* check line 349 also *)
      | GenNode 22 [GenLeaf (inr (inr (inl fname))); e] => ExternalCall fname (go e)
      | _ => Val $ LitV LitUnit (* dummy *)
@@ -414,7 +381,7 @@ Proof.
    for go).
  refine (inj_countable' enc dec _).
  refine (fix go (e : expr) {struct e} := _ with gov (v : val) {struct v} := _ for go).
- - destruct e as [v| | | | | | | | | | | | | | | | | | | | | | |]; simpl; f_equal;
+ - destruct e as [v| | | | | | | | | | | | | | | | |]; simpl; f_equal;
      [exact (gov v)|done..].
  - destruct v; by f_equal.
 Qed.
@@ -457,16 +424,6 @@ Inductive ectx_item :=
   | LoadCtx
   | StoreLCtx (v2 : val)
   | StoreRCtx (e1 : expr)
-  | XchgLCtx (v2 : val)
-  | XchgRCtx (e1 : expr)
-  | CmpXchgLCtx (v1 : val) (v2 : val)
-  | CmpXchgMCtx (e0 : expr) (v2 : val)
-  | CmpXchgRCtx (e0 : expr) (e1 : expr)
-  | FaaLCtx (v2 : val)
-  | FaaRCtx (e1 : expr)
-  | ResolveLCtx (ctx : ectx_item) (v1 : val) (v2 : val)
-  | ResolveMCtx (e0 : expr) (v2 : val)
-  | ResolveRCtx (e0 : expr) (e1 : expr)
   | ExternalCallCtx (fn : binder).
 
 (** Contextual closure will only reduce [e] in [Resolve e (Val _) (Val _)] if
@@ -497,16 +454,6 @@ Fixpoint fill_item (Ki : ectx_item) (e : expr) : expr :=
   | LoadCtx => Load e
   | StoreLCtx v2 => Store e (Val v2)
   | StoreRCtx e1 => Store e1 e
-  | XchgLCtx v2 => Xchg e (Val v2)
-  | XchgRCtx e1 => Xchg e1 e
-  | CmpXchgLCtx v1 v2 => CmpXchg e (Val v1) (Val v2)
-  | CmpXchgMCtx e0 v2 => CmpXchg e0 e (Val v2)
-  | CmpXchgRCtx e0 e1 => CmpXchg e0 e1 e
-  | FaaLCtx v2 => FAA e (Val v2)
-  | FaaRCtx e1 => FAA e1 e
-  | ResolveLCtx K v1 v2 => Resolve (fill_item K e) (Val v1) (Val v2)
-  | ResolveMCtx ex v2 => Resolve ex e (Val v2)
-  | ResolveRCtx ex e1 => Resolve ex e1 e
   | ExternalCallCtx fn => ExternalCall fn e
   end.
 
@@ -530,13 +477,7 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
   | AllocN e1 e2 => AllocN (subst x v e1) (subst x v e2)
   | Free e => Free (subst x v e)
   | Load e => Load (subst x v e)
-  | Xchg e1 e2 => Xchg (subst x v e1) (subst x v e2)
   | Store e1 e2 => Store (subst x v e1) (subst x v e2)
-  | CmpXchg e0 e1 e2 => CmpXchg (subst x v e0) (subst x v e1) (subst x v e2)
-  | FAA e1 e2 => FAA (subst x v e1) (subst x v e2)
-  | Fork e => Fork (subst x v e)
-  | NewProph => NewProph
-  | Resolve ex e1 e2 => Resolve (subst x v ex) (subst x v e1) (subst x v e2)
   | ExternalCall fn e0 => ExternalCall fn (subst x v e0)
   end.
 
@@ -675,74 +616,6 @@ Axiom det_external_call :
     external_call fn v v2 →
     v1 = v2.
 
-Inductive base_step_nc : expr → state → expr → state → Prop :=
-  | NC_RecS f x e σ :
-     base_step_nc (Rec f x e) σ (Val $ RecV f x e) σ
-  | NC_PairS v1 v2 σ :
-     base_step_nc (Pair (Val v1) (Val v2)) σ (Val $ PairV v1 v2) σ
-  | NC_InjLS v σ :
-     base_step_nc (InjL $ Val v) σ (Val $ InjLV v) σ
-  | NC_InjRS v σ :
-     base_step_nc (InjR $ Val v) σ (Val $ InjRV v) σ
-  | NC_BetaS f x e1 v2 e' σ :
-     e' = subst' x v2 (subst' f (RecV f x e1) e1) →
-     base_step_nc (App (Val $ RecV f x e1) (Val v2)) σ e' σ
-  | NC_UnOpS op v v' σ :
-     un_op_eval op v = Some v' →
-     base_step_nc (UnOp op (Val v)) σ (Val v') σ
-  | NC_BinOpS op v1 v2 v' σ :
-     bin_op_eval op v1 v2 = Some v' →
-     base_step_nc (BinOp op (Val v1) (Val v2)) σ (Val v') σ
-  | NC_IfTrueS e1 e2 σ :
-     base_step_nc (If (Val $ LitV $ LitBool true) e1 e2) σ e1 σ
-  | NC_IfFalseS e1 e2 σ :
-     base_step_nc (If (Val $ LitV $ LitBool false) e1 e2) σ e2 σ
-  | NC_FstS v1 v2 σ :
-     base_step_nc (Fst (Val $ PairV v1 v2)) σ (Val v1) σ
-  | NC_SndS v1 v2 σ :
-     base_step_nc (Snd (Val $ PairV v1 v2)) σ (Val v2) σ
-  | NC_CaseLS v e1 e2 σ :
-     base_step_nc (Case (Val $ InjLV v) e1 e2) σ (App e1 (Val v)) σ
-  | NC_CaseRS v e1 e2 σ :
-     base_step_nc (Case (Val $ InjRV v) e1 e2) σ (App e2 (Val v)) σ
-  | NC_AllocNS n v σ l :
-     (0 < n)%Z →
-     (∀ i, (0 ≤ i)%Z → (i < n)%Z → σ.(heap) !! (l +ₗ i) = None) →
-     base_step_nc (AllocN (Val $ LitV $ LitInt n) (Val v)) σ
-               (Val $ LitV $ LitLoc l) (state_init_heap l n v σ)
-  | NC_FreeS l v σ :
-     σ.(heap) !! l = Some $ Some v →
-     base_step_nc (Free (Val $ LitV $ LitLoc l)) σ
-               (Val $ LitV LitUnit) (state_upd_heap <[l:=None]> σ)
-  | NC_LoadS l v σ :
-     σ.(heap) !! l = Some $ Some v →
-     base_step_nc (Load (Val $ LitV $ LitLoc l)) σ (of_val v) σ
-  | NC_StoreS l v w σ :
-     σ.(heap) !! l = Some $ Some v →
-     base_step_nc (Store (Val $ LitV $ LitLoc l) (Val w)) σ
-               (Val $ LitV LitUnit) (state_upd_heap <[l:=Some w]> σ)
-  | NC_XchgS l v1 v2 σ :
-     σ.(heap) !! l = Some $ Some v1 →
-     base_step_nc (Xchg (Val $ LitV $ LitLoc l) (Val v2)) σ
-               (Val v1) (state_upd_heap <[l:=Some v2]> σ)
-
-  | NC_CmpXchgS l v1 v2 vl σ b :
-     σ.(heap) !! l = Some $ Some vl →
-     (* Crucially, this compares the same way as [EqOp]! *)
-     vals_compare_safe vl v1 →
-     b = bool_decide (vl = v1) →
-     base_step_nc (CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2)) σ
-               (Val $ PairV vl (LitV $ LitBool b)) (if b then state_upd_heap <[l:=Some v2]> σ else σ)
-  | NC_FaaS l i1 i2 σ :
-     σ.(heap) !! l = Some $ Some (LitV (LitInt i1)) →
-     base_step_nc (FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2)) σ
-               (Val $ LitV $ LitInt i1) (state_upd_heap <[l:=Some $ LitV (LitInt (i1 + i2))]>σ)
-  | NC_ExternalCallS fn v σ v':
-      first_order_val v →
-      first_order_val v' →
-      external_call fn v v' →
-      base_step_nc (ExternalCall fn (Val v)) σ (Val v') σ.
-
 Inductive base_step : expr → state → list observation → expr → state → list expr → Prop :=
   | RecS f x e σ :
      base_step (Rec f x e) σ [] (Val $ RecV f x e) σ []
@@ -795,40 +668,6 @@ Inductive base_step : expr → state → list observation → expr → state →
                []
                (Val $ LitV LitUnit) (state_upd_heap <[l:=Some w]> σ)
                []
-  | XchgS l v1 v2 σ :
-     σ.(heap) !! l = Some $ Some v1 →
-     base_step (Xchg (Val $ LitV $ LitLoc l) (Val v2)) σ
-               []
-               (Val v1) (state_upd_heap <[l:=Some v2]> σ)
-               []
-
-  | CmpXchgS l v1 v2 vl σ b :
-     σ.(heap) !! l = Some $ Some vl →
-     (* Crucially, this compares the same way as [EqOp]! *)
-     vals_compare_safe vl v1 →
-     b = bool_decide (vl = v1) →
-     base_step (CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2)) σ
-               []
-               (Val $ PairV vl (LitV $ LitBool b)) (if b then state_upd_heap <[l:=Some v2]> σ else σ)
-               []
-  | FaaS l i1 i2 σ :
-     σ.(heap) !! l = Some $ Some (LitV (LitInt i1)) →
-     base_step (FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2)) σ
-               []
-               (Val $ LitV $ LitInt i1) (state_upd_heap <[l:=Some $ LitV (LitInt (i1 + i2))]>σ)
-               []
-  | ForkS e σ:
-     base_step (Fork e) σ [] (Val $ LitV LitUnit) σ [e]
-  | NewProphS σ p :
-     p ∉ σ.(used_proph_id) →
-     base_step NewProph σ
-               []
-               (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ)
-               []
-  | ResolveS p v e σ w σ' κs ts :
-     base_step e σ κs (Val v) σ' ts →
-     base_step (Resolve e (Val $ LitV $ LitProphecy p) (Val w)) σ
-               (κs ++ [(p, (v, w))]) (Val v) σ' ts
   | ExternalCallS fn v σ v':
       first_order_val v →
       first_order_val v' →
@@ -868,11 +707,6 @@ Proof.
   intros. apply not_elem_of_dom.
   by apply Loc.fresh_fresh.
 Qed.
-
-Lemma new_proph_id_fresh σ :
-  let p := fresh σ.(used_proph_id) in
-  base_step NewProph σ [] (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ) [].
-Proof. constructor. apply is_fresh. Qed.
 
 Lemma heap_lang_mixin : EctxiLanguageMixin of_val to_val fill_item base_step.
 Proof.
@@ -920,19 +754,3 @@ Lemma base_step_to_val e1 σ1 κ e2 σ2 efs σ1' κ' e2' σ2' efs' :
   base_step e1 σ1 κ e2 σ2 efs →
   base_step e1 σ1' κ' e2' σ2' efs' → is_Some (to_val e2) → is_Some (to_val e2').
 Proof. destruct 1; inversion 1; naive_solver. Qed.
-
-Lemma irreducible_resolve e v1 v2 σ :
-  irreducible e σ → irreducible (Resolve e (Val v1) (Val v2)) σ.
-Proof.
-  intros H κs ? σ' efs [Ks e1' e2' Hfill -> step]. simpl in *.
-  induction Ks as [|K Ks _] using rev_ind; simpl in Hfill.
-  - subst e1'. inversion step. eapply H. by apply base_prim_step.
-  - rewrite fill_app /= in Hfill.
-    destruct K; (inversion Hfill; subst; clear Hfill; try
-      match goal with | H : Val ?v = fill Ks ?e |- _ =>
-        (assert (to_val (fill Ks e) = Some v) as HEq by rewrite -H //);
-        apply to_val_fill_some in HEq; destruct HEq as [-> ->]; inversion step
-      end).
-    eapply (H κs (fill_item _ (foldl (flip fill_item) e2' Ks)) σ' efs).
-    eapply (Ectx_step (Ks ++ [_])); last done; simpl; by rewrite fill_app.
-Qed.
