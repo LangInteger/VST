@@ -100,7 +100,6 @@ Proof.
   (* for that, I need to show: decompose_expr [] (fill K e1) = Some (k e1), which is not provable *)
 
 Admitted.
-Qed.
 
 
 Program Definition HL_core_sem:
