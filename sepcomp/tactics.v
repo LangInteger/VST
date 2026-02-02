@@ -23,13 +23,6 @@ Fixpoint decompose_expr(K : list ectx_item) (e : expr)
   | Load e1 => decompose_expr (LoadCtx::K) e1
   | Store e1 (Val v) => decompose_expr ((StoreLCtx v)::K) e1
   | Store e1 e2 => decompose_expr ((StoreRCtx e1)::K) e2
-  | Xchg e1 (Val v) => decompose_expr ((XchgLCtx v)::K) e1
-  | Xchg e1 e2 => decompose_expr ((XchgRCtx e1)::K) e2
-  | CmpXchg e0 (Val v1) (Val v2) => decompose_expr ((CmpXchgLCtx v1 v2)::K) e0
-  | CmpXchg e0 e1 (Val v2) => decompose_expr ((CmpXchgMCtx e0 v2)::K) e1
-  | CmpXchg e0 e1 e2 => decompose_expr ((CmpXchgRCtx e0 e1)::K) e2
-  | FAA e1 (Val v) => decompose_expr ((FaaLCtx v)::K) e1
-  | FAA e1 e2 => decompose_expr ((FaaRCtx e1)::K) e2
   | ExternalCall f arg => decompose_expr ((ExternalCallCtx f)::K) arg
   | _ => Some (K, e)
   end.
@@ -99,21 +92,10 @@ Ltac reshape_expr e tac :=
     | Load ?e                         => add_item LoadCtx vs K e
     | Store ?e (Val ?v)               => add_item (StoreLCtx v) vs K e
     | Store ?e1 ?e2                   => add_item (StoreRCtx e1) vs K e2
-    | Xchg ?e (Val ?v)                => add_item (XchgLCtx v) vs K e
-    | Xchg ?e1 ?e2                    => add_item (XchgRCtx e1) vs K e2
-    | CmpXchg ?e0 (Val ?v1) (Val ?v2) => add_item (CmpXchgLCtx v1 v2) vs K e0
-    | CmpXchg ?e0 ?e1 (Val ?v2)       => add_item (CmpXchgMCtx e0 v2) vs K e1
-    | CmpXchg ?e0 ?e1 ?e2             => add_item (CmpXchgRCtx e0 e1) vs K e2
-    | FAA ?e (Val ?v)                 => add_item (FaaLCtx v) vs K e
-    | FAA ?e1 ?e2                     => add_item (FaaRCtx e1) vs K e2
-    | Resolve ?ex (Val ?v1) (Val ?v2) => go K ((v1,v2) :: vs) ex
-    | Resolve ?ex ?e1 (Val ?v2)       => add_item (ResolveMCtx ex v2) vs K e1
-    | Resolve ?ex ?e1 ?e2             => add_item (ResolveRCtx ex e1) vs K e2
     end
   with add_item Ki vs K e :=
     lazymatch vs with
-    | []               => go (Ki :: K) (@nil (val * val)) e
-    | (?v1,?v2) :: ?vs => add_item (ResolveLCtx Ki v1 v2) vs K e
+    | _               => go (Ki :: K) (@nil (val * val)) e
     end
   in
   go (@nil ectx_item) (@nil (val * val)) e.
@@ -139,6 +121,4 @@ Global Hint Extern 0 (base_reducible_no_obs _ _) => eexists _, _, _; simpl : bas
 
 (* [simpl apply] is too stupid, so we need extern hints here. *)
 Global Hint Extern 1 (base_step _ _ _ _ _ _) => econstructor : base_step.
-Global Hint Extern 0 (base_step (CmpXchg _ _ _) _ _ _ _ _) => eapply CmpXchgS : base_step.
 Global Hint Extern 0 (base_step (AllocN _ _) _ _ _ _ _) => apply alloc_fresh : base_step.
-Global Hint Extern 0 (base_step NewProph _ _ _ _ _) => apply new_proph_id_fresh : base_step.
