@@ -467,7 +467,7 @@ Inductive ectx_item :=
   | ResolveLCtx (ctx : ectx_item) (v1 : val) (v2 : val)
   | ResolveMCtx (e0 : expr) (v2 : val)
   | ResolveRCtx (e0 : expr) (e1 : expr)
-  | ExternalCallCtx (fn : string).
+  | ExternalCallCtx (fn : binder).
 
 (** Contextual closure will only reduce [e] in [Resolve e (Val _) (Val _)] if
 the local context of [e] is non-empty. As a consequence, the first argument of

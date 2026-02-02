@@ -1,47 +1,68 @@
 From stdpp Require Import fin_maps.
 Require Import VST.sepcomp.lang.
 
-
-Fixpoint decompose_expr (gas : nat) (K : list ectx_item) (e : expr)
+Fixpoint decompose_expr(K : list ectx_item) (e : expr)
   : option (list ectx_item * expr) :=
-  match gas with 0 => None 
-  | S gas' =>
   match e with
-  | App e1 (Val v) => decompose_expr gas' ((AppLCtx v) :: K) e1
-  | App e1 e2 => decompose_expr gas' ((AppRCtx e1)::K) e2
-  | UnOp op e1 => decompose_expr gas' ((UnOpCtx op)::K) e1
-  | BinOp op e1 (Val v) => decompose_expr gas' ((BinOpLCtx op v)::K) e1
-  | BinOp op e1 e2 => decompose_expr gas' ((BinOpRCtx op e1)::K) e2
-  | If e0 e1 e2 => decompose_expr gas' ((IfCtx e1 e2)::K) e0
-  | Pair e1 (Val v) => decompose_expr gas' ((PairLCtx v)::K) e1
-  | Pair e1 e2 => decompose_expr gas' ((PairRCtx e1)::K) e2
-  | Fst e1 => decompose_expr gas' (FstCtx::K) e1
-  | Snd e1 => decompose_expr gas' (SndCtx::K) e1
-  | InjL e1 => decompose_expr gas' (InjLCtx::K) e1
-  | InjR e1 => decompose_expr gas' (InjRCtx::K) e1
-  | Case e0 e1 e2 => decompose_expr gas' ((CaseCtx e1 e2)::K) e0
-  | AllocN e1 (Val v) => decompose_expr gas' ((AllocNLCtx v)::K) e1
-  | AllocN e1 e2 => decompose_expr gas' ((AllocNRCtx e1)::K) e2 
-  | Free e1 => decompose_expr gas' (FreeCtx::K) e1
-  | Load e1 => decompose_expr gas' (LoadCtx::K) e1
-  | Store e1 (Val v) => decompose_expr gas' ((StoreLCtx v)::K) e1
-  | Store e1 e2 => decompose_expr gas' ((StoreRCtx e1)::K) e2
-  | Xchg e1 (Val v) => decompose_expr gas' ((XchgLCtx v)::K) e1
-  | Xchg e1 e2 => decompose_expr gas' ((XchgRCtx e1)::K) e2
-  | CmpXchg e0 (Val v1) (Val v2) => decompose_expr gas' ((CmpXchgLCtx v1 v2)::K) e0
-  | CmpXchg e0 e1 (Val v2) => decompose_expr gas' ((CmpXchgMCtx e0 v2)::K) e1
-  | CmpXchg e0 e1 e2 => decompose_expr gas' ((CmpXchgRCtx e0 e1)::K) e2
-  | FAA e1 (Val v) => decompose_expr gas' ((FaaLCtx v)::K) e1
-  | FAA e1 e2 => decompose_expr gas' ((FaaRCtx e1)::K) e2
+  | App e1 (Val v) => decompose_expr ((AppLCtx v) :: K) e1
+  | App e1 e2 => decompose_expr ((AppRCtx e1)::K) e2
+  | UnOp op e1 => decompose_expr ((UnOpCtx op)::K) e1
+  | BinOp op e1 (Val v) => decompose_expr ((BinOpLCtx op v)::K) e1
+  | BinOp op e1 e2 => decompose_expr ((BinOpRCtx op e1)::K) e2
+  | If e0 e1 e2 => decompose_expr ((IfCtx e1 e2)::K) e0
+  | Pair e1 (Val v) => decompose_expr ((PairLCtx v)::K) e1
+  | Pair e1 e2 => decompose_expr ((PairRCtx e1)::K) e2
+  | Fst e1 => decompose_expr (FstCtx::K) e1
+  | Snd e1 => decompose_expr (SndCtx::K) e1
+  | InjL e1 => decompose_expr (InjLCtx::K) e1
+  | InjR e1 => decompose_expr (InjRCtx::K) e1
+  | Case e0 e1 e2 => decompose_expr ((CaseCtx e1 e2)::K) e0
+  | AllocN e1 (Val v) => decompose_expr ((AllocNLCtx v)::K) e1
+  | AllocN e1 e2 => decompose_expr ((AllocNRCtx e1)::K) e2 
+  | Free e1 => decompose_expr (FreeCtx::K) e1
+  | Load e1 => decompose_expr (LoadCtx::K) e1
+  | Store e1 (Val v) => decompose_expr ((StoreLCtx v)::K) e1
+  | Store e1 e2 => decompose_expr ((StoreRCtx e1)::K) e2
+  | Xchg e1 (Val v) => decompose_expr ((XchgLCtx v)::K) e1
+  | Xchg e1 e2 => decompose_expr ((XchgRCtx e1)::K) e2
+  | CmpXchg e0 (Val v1) (Val v2) => decompose_expr ((CmpXchgLCtx v1 v2)::K) e0
+  | CmpXchg e0 e1 (Val v2) => decompose_expr ((CmpXchgMCtx e0 v2)::K) e1
+  | CmpXchg e0 e1 e2 => decompose_expr ((CmpXchgRCtx e0 e1)::K) e2
+  | FAA e1 (Val v) => decompose_expr ((FaaLCtx v)::K) e1
+  | FAA e1 e2 => decompose_expr ((FaaRCtx e1)::K) e2
+  | ExternalCall f arg => decompose_expr ((ExternalCallCtx f)::K) arg
   | _ => Some (K, e)
-  end
-end.
+  end.
+
+Search fill.
+
+Lemma decompose_expr_fill_revised :
+  forall K e K' e',
+    decompose_expr [] (fill K e) = Some (K', e')
+    -> fill K' e' = fill K e.
+Proof.
+Admitted.
+
 
 Lemma decompose_expr_fill :
-  forall gas e K' e',
-    decompose_expr gas [] e = Some (K', e') ->
-    e = fill K' e'.
+  forall e K e',
+    e = fill K e' ->
+    decompose_expr [] e = Some (K, e').
 Proof.
+  intros.
+  induction e.
+  {
+    simpl. 
+    assert (to_val (fill K e') = Some v) as Hval. 
+    {
+      rewrite <- H. simpl. reflexivity.
+    }
+    apply to_val_fill_some in Hval.
+    destruct Hval as [Hval1 Hval2].
+    rewrite Hval1.
+    rewrite Hval2.
+    reflexivity.
+  }
 Admitted.
 
 (** The tactic [reshape_expr e tac] decomposes the expression [e] into an

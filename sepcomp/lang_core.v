@@ -35,7 +35,7 @@ Definition hl_initial_core (v: val) (params: list val) : option expr :=
 
 Definition default_signature : signature := mksignature nil Xvoid cc_default.
 Definition hl_at_external (e: expr) : option (external_function * list val) :=
-  match (decompose_expr 1000 [] e) with
+  match (decompose_expr [] e) with
   (* only when func name can be extracted from the binder *)
   | Some (K, ExternalCall (BNamed fname) arg) => 
       match (to_val arg) with
@@ -49,7 +49,7 @@ Definition hl_at_external (e: expr) : option (external_function * list val) :=
 Definition hl_after_external (vret: option val) (e: expr) : option expr :=
   match vret with
   | Some v => 
-      match (decompose_expr 1000 [] e) with
+      match (decompose_expr [] e) with
       | Some (K, ExternalCall (BNamed fname) arg) => 
           match (to_val arg) with
           | Some argv => Some (fill K (of_val v))
@@ -80,10 +80,8 @@ Lemma HL_corestep_not_at_external:
           hl_prim_step q m q' m' -> hl_at_external q = None.
 Proof.
  intros.
- inv H. inv H0. simpl.
- destruct hl_at_external eqn:H3; eauto.
- destruct H2.
- unfold hl_at_external in H3.
+ inv H.
+ unfold hl_at_external.
 Admitted.
 
 
@@ -112,6 +110,7 @@ Section specs.
         /\ (not (eq (hl_halted e) None) -> Q m)
         (* external call case *)
         /\ (forall fname sig args vret e',
+          (* m_extra satisfied the pre_sped of the external call *)
           hl_at_external e = Some (EF_external fname sig, args)
           -> hl_after_external (Some vret) e = Some e'
           -> respecting_the_specs e' m Q) 
