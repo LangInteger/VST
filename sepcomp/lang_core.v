@@ -100,7 +100,7 @@ Proof.
     rewrite Hredxe1 in Heq.
 
 
-    (* But base_step never steps an external call at the head *)
+    (* e1 in any base_step cannot be decompose into an external function call *)
     assert (forall σ κ e2 σ' efs fn arg K K',
               base_step e1 σ κ e2 σ' efs -> not (decompose_expr K e1 = Some (K', ExternalCall fn arg))) as Hnot_ext.
     { intros. inversion H0; intro Heq1; discriminate. }
