@@ -27,20 +27,304 @@ Fixpoint decompose_expr(K : list ectx_item) (e : expr)
   | _ => Some (K, e)
   end.
 
-Search (_++[]=_).
-Search fill.
-Search (_++_::_=_++_++_).
-Lemma decompose_persist : 
-  forall K1 e K2,
-    decompose_expr K1 (fill K2 e) = decompose_expr (K1++K2) e.
+Lemma base_reducible_not_value :
+  forall e σ,
+    base_reducible e σ -> to_val e = None.
 Proof.
-  intros.
-  revert K2. revert K1.
-  induction e.
-  - intros. simpl.
-    induction K2.
-    + simpl. rewrite app_nil_r. reflexivity.
-    + 
+  intros e σ [e' [σ' [κs [e_fs Hstep]]]].
+  inversion Hstep; subst; simpl; auto.
+Qed.
+
+Lemma base_step_not_value :
+  forall e σ e' σ' κ efs,
+    base_step e σ κ e' σ' efs -> to_val e = None.
+Proof.
+  intros e σ e' σ' κ e_fs Hstep.
+  inversion Hstep; subst; simpl; auto.
+Qed.
+
+Lemma reducible_not_value :
+  forall e σ,
+    reducible e σ -> to_val e = None.
+Proof.
+  intros e σ [e' [σ' [κ [efs Hprimstep]]]].
+  inversion Hprimstep as [K e1' e2' Hfill1 Hfill2 Hbase]; subst.
+  assert (to_val e1' = None) as Hval.
+  { destruct (to_val e1') eqn:He1val.
+    - inversion Hbase; apply base_step_not_value in Hbase; rewrite Hbase in He1val; auto.
+    - reflexivity.
+  }
+  apply fill_not_val; auto.
+Qed.
+
+Lemma decompose_redo_fill_head :
+  forall (hK : ectx_item) (K : list ectx_item) e m,
+    reducible e m ->
+    decompose_expr (hK::K) e = decompose_expr K (fill [hK] e).
+Proof.
+  intros hK K e m H.
+  apply reducible_not_value in H.
+  destruct hK eqn: EhK; simpl; try reflexivity.
+  - destruct e eqn:Eqe; simpl; try reflexivity. discriminate.
+  - destruct e eqn:Eqe; simpl; try reflexivity. discriminate.
+  - destruct e eqn:Eqe; simpl; try reflexivity. discriminate.
+  - destruct e eqn:Eqe; simpl; try reflexivity. discriminate.
+  - destruct e eqn:Eqe; simpl; try reflexivity. discriminate.
+Qed.
+
+Search (fill ).
+Lemma decompose_redo_fill : 
+  forall K1 K2 e m,
+    reducible e m ->
+    decompose_expr K1 (fill K2 e) = decompose_expr (K2++K1) e.
+Proof.
+  intros K1 K2 e m H.
+  revert H. revert e. revert m. revert K1.
+  induction K2.
+  - intros. simpl. reflexivity.
+  - induction a.
+    + intros. simpl. specialize (IHK2 K1 m (App e (Val v2))).
+      assert (reducible (App e (Val v2)) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [AppLCtx v2]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1.
+      }
+      specialize (IHK2 Hasse). apply IHK2. 
+    + intros. simpl. specialize (IHK2 K1 m (App e1 e)).
+      assert (reducible (App e1 e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [AppRCtx e1]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1.
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (AppRCtx e1) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (UnOp op e)).
+      assert (reducible (UnOp op e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [UnOpCtx op]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1.
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (UnOpCtx op) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (BinOp op e (Val v2))).
+      assert (reducible (BinOp op e (Val v2)) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [BinOpLCtx op v2]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1.
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (BinOpLCtx op v2) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (BinOp op e1 e)).
+      assert (reducible (BinOp op e1 e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [BinOpRCtx op e1]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (BinOpRCtx op e1) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (If e e1 e2)).
+      assert (reducible (If e e1 e2) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [IfCtx e1 e2]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (IfCtx e1 e2) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (Pair e (Val v2))).
+      assert (reducible (Pair e (Val v2)) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [PairLCtx v2]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (PairLCtx v2) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (Pair e1 e)).
+      assert (reducible (Pair e1 e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [PairRCtx e1]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (PairRCtx e1) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (Fst e)).
+      assert (reducible (Fst e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [FstCtx]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (FstCtx) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (Snd e)).
+      assert (reducible (Snd e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [SndCtx]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (SndCtx) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (InjL e)).
+      assert (reducible (InjL e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [InjLCtx]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (InjLCtx) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (InjR e)).
+      assert (reducible (InjR e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [InjRCtx]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (InjRCtx) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (Case e e1 e2)).
+      assert (reducible (Case e e1 e2) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [CaseCtx e1 e2]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (CaseCtx e1 e2) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (AllocN e (Val v2))).
+      assert (reducible (AllocN e (Val v2)) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [AllocNLCtx v2]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (AllocNLCtx v2) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (AllocN e1 e)).
+      assert (reducible (AllocN e1 e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [AllocNRCtx e1]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (AllocNRCtx e1) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (Free e)).
+      assert (reducible (Free e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [FreeCtx]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (FreeCtx) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (Load e)).
+      assert (reducible (Load e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [LoadCtx]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (LoadCtx) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (Store e (Val v2))).
+      assert (reducible (Store e (Val v2)) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [StoreLCtx v2]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (StoreLCtx v2) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (Store e1 e)).
+      assert (reducible (Store e1 e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [StoreRCtx e1]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (StoreRCtx e1) (K2++K1)) in H. auto. 
+    + intros. simpl. specialize (IHK2 K1 m (ExternalCall fn e)).
+      assert (reducible (ExternalCall fn e) m) as Hasse. {
+        unfold reducible.
+        destruct H as [κ' [e'' [σ'' [efs' Hprim]]]].
+        destruct Hprim.
+        eexists _, _, _, _.
+        eapply Ectx_step with (K := K ++ [ExternalCallCtx fn]) (e1' := e1') (e2' := e2').
+        - simpl. rewrite fill_app. rewrite H. simpl. reflexivity.
+        - reflexivity.
+        - apply H1. 
+      }
+      specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (ExternalCallCtx fn) (K2++K1)) in H. auto. 
+Qed.
+    
 
 Lemma decompose_expr_fill_revised :
   forall K e K' e',
