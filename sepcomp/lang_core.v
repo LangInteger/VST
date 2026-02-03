@@ -81,11 +81,11 @@ Lemma HL_corestep_not_at_external:
 Proof.
   intros m q m' q' Hstep.
   inversion Hstep as [e σ σ' κs e' efs Hprim]; subst.
-  destruct Hprim as [K e1 e2 Hbase Hfill].
+  destruct Hprim as [K e1 e2 Hfill_e1 Hfill_e2].
   unfold hl_at_external.
   destruct (decompose_expr [] (fill K e1)) eqn:Heq.
   destruct p as [K' e_ext].
-  destruct e_ext eqn:Heq_ext; rewrite Hbase; simpl; rewrite Heq; try reflexivity.
+  destruct e_ext eqn:Heq_ext; rewrite Hfill_e1; simpl; rewrite Heq; try reflexivity.
 
   (* Only the case where e_ext is an external call left *)
 

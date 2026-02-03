@@ -27,7 +27,20 @@ Fixpoint decompose_expr(K : list ectx_item) (e : expr)
   | _ => Some (K, e)
   end.
 
+Search (_++[]=_).
 Search fill.
+Search (_++_::_=_++_++_).
+Lemma decompose_persist : 
+  forall K1 e K2,
+    decompose_expr K1 (fill K2 e) = decompose_expr (K1++K2) e.
+Proof.
+  intros.
+  revert K2. revert K1.
+  induction e.
+  - intros. simpl.
+    induction K2.
+    + simpl. rewrite app_nil_r. reflexivity.
+    + 
 
 Lemma decompose_expr_fill_revised :
   forall K e K' e',
