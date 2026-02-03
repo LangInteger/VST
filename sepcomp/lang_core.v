@@ -88,18 +88,30 @@ Proof.
   destruct e_ext eqn:Heq_ext; rewrite Hfill_e1; simpl; rewrite Heq; try reflexivity.
 
   (* Only the case where e_ext is an external call left *)
+  {
+    assert (reducible e1 m) as Hredxe1. {
+      unfold reducible.
+      apply base_prim_step in H.
+      eexists _, _, _, _.
+      apply H.
+    }
+    apply (decompose_redo_fill [] K) in Hredxe1.
+    rewrite app_nil_r in Hredxe1.
+    rewrite Hredxe1 in Heq.
 
-  (* But base_step never steps an external call at the head *)
-  assert (forall σ κ e2 σ' efs fn arg,
-            base_step e1 σ κ e2 σ' efs -> not (e1 = ExternalCall fn arg)) as Hnot_ext.
-  { intros. inversion H0; intro Heq1; discriminate. }
-  specialize (Hnot_ext m κs e2 m' efs fname e H).
 
-  (* try to build a contradictory here, show that e_ext should not be an external call *)
-  
-  (* for that, I need to show: decompose_expr [] (fill K e1) = Some (k e1), which is not provable *)
-
-Admitted.
+    (* But base_step never steps an external call at the head *)
+    assert (forall σ κ e2 σ' efs fn arg K K',
+              base_step e1 σ κ e2 σ' efs -> not (decompose_expr K e1 = Some (K', ExternalCall fn arg))) as Hnot_ext.
+    { intros. inversion H0; intro Heq1; discriminate. }
+    specialize (Hnot_ext m κs e2 m' efs fname e K K' H).
+    rewrite Heq in Hnot_ext.
+    congruence.
+  }
+  {
+    subst. simpl. rewrite Heq. reflexivity.
+  }
+Qed.
 
 
 Program Definition HL_core_sem:

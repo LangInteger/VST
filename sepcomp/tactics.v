@@ -324,36 +324,6 @@ Proof.
       }
       specialize (IHK2 Hasse). rewrite IHK2. apply (decompose_redo_fill_head (ExternalCallCtx fn) (K2++K1)) in H. auto. 
 Qed.
-    
-
-Lemma decompose_expr_fill_revised :
-  forall K e K' e',
-    decompose_expr [] (fill K e) = Some (K', e')
-    -> fill K' e' = fill K e.
-Proof.
-Admitted.
-
-
-Lemma decompose_expr_fill :
-  forall e K e',
-    e = fill K e' ->
-    decompose_expr [] e = Some (K, e').
-Proof.
-  intros.
-  induction e.
-  {
-    simpl. 
-    assert (to_val (fill K e') = Some v) as Hval. 
-    {
-      rewrite <- H. simpl. reflexivity.
-    }
-    apply to_val_fill_some in Hval.
-    destruct Hval as [Hval1 Hval2].
-    rewrite Hval1.
-    rewrite Hval2.
-    reflexivity.
-  }
-Admitted.
 
 (** The tactic [reshape_expr e tac] decomposes the expression [e] into an
 evaluation context [K] and a subexpression [e']. It calls the tactic [tac K e']
